@@ -696,21 +696,24 @@
     document.body.addEventListener('touchend', () => { isSpittingBlack = false; isShootingWhite = false; });
 
     const fpsCounter = document.getElementById('fps-counter');
-    let lastFpsTime = performance.now();
     let frames = 0;
+    let lastFpsTime = performance.now();
     let lastTime = performance.now();
     
-    function loop(time) {
+    function loop() {
       requestAnimationFrame(loop);
       
-      const dt = time - lastTime;
-      lastTime = time;
+      const now = performance.now();
+      const dt = now - lastTime;
+      lastTime = now;
 
       frames++;
-      if (time - lastFpsTime >= 1000) {
-        fpsCounter.textContent = `${Math.round(frames * 1000 / (time - lastFpsTime))} FPS`;
+      if (now - lastFpsTime >= 500) {
+        // Update display every 500ms for accurate and responsive linkage
+        const actualFps = Math.round((frames * 1000) / (now - lastFpsTime));
+        fpsCounter.textContent = `${actualFps} FPS`;
         frames = 0;
-        lastFpsTime = time;
+        lastFpsTime = now;
       }
 
       const targetBhScale = isLightMode ? 1 : 0;
