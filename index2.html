@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>DOM 引力场演化</title>
+  <style>
+    :root {
+      /* Night Mode Variables (Default) */
+      --bg-color: #0F1014;
+      --text-color: #E5E7EB;
+      --accent: #E5E7EB;
+      --toggle-bg: #2C2D32;
+      --knocked-color: #FF453A;
+    }
+    
+    [data-theme="light"] {
+      /* Day Mode Variables */
+      --bg-color: #F2F4F7;
+      --text-color: #1C1C1E;
+      --accent: #1C1C1E;
+      --toggle-bg: #D1D5DB;
+      --knocked-color: #FF3B30;
+    }
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: var(--bg-color);
+      transition: background-color 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    #stage {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none; /* Let clicks pass to body */
+      z-index: 10;
+    }
+
+    .particle {
+      position: absolute;
+      top: 0;
+      left: 0;
+      color: var(--text-color);
+      transition: color 0.8s;
+      will-change: transform;
+      user-select: none;
+      line-height: 1.6;
+      /* Improve text rendering */
+      -webkit-font-smoothing: antialiased;
+    }
+    .particle.knocked-down {
+      color: var(--knocked-color);
+      transition: none; /* Instant fallback */
+      font-weight: 600;
+    }
+
+    .bullet {
+      position: absolute;
+      top: 0;
+      left: 0;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 0 20px rgba(100, 200, 255, 0.8);
+      will-change: transform;
+    }
+
+    #black-hole, #white-hole {
+      position: absolute;
+      top: 0;
+      left: 0;
+      border-radius: 50%;
+      transform-origin: center center;
+      will-change: transform, width, height, opacity;
+      z-index: 5;
+    }
+    
+    #black-hole {
+      background: radial-gradient(circle at center, #000000 0%, #1a1a1a 40%, transparent 80%);
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+    }
+
+    #white-hole {
+      background: radial-gradient(circle at center, #ffffff 0%, #f0f0f0 40%, transparent 80%);
+      box-shadow: 0 0 40px rgba(255,255,255,0.8);
+    }
+
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: var(--text-color);
+      transition: color 0.8s;
+      z-index: 20;
+      font-size: 16px;
+      letter-spacing: 2px;
+      pointer-events: none;
+      display: none;
+      font-weight: 300;
+    }
+
+    #fps-counter {
+      position: absolute;
+      top: 15px;
+      left: 20px;
+      color: var(--text-color);
+      font-weight: 700;
+      font-size: 16px;
+      z-index: 30;
+      transition: color 0.8s;
+      font-family: monospace;
+      pointer-events: none;
+    }
+
+    /* Premium Toggle Switch */
+    .toggle-container {
+      position: absolute;
+      top: 15px;
+      right: 330px;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--text-color);
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.8s;
+      user-select: none;
+    }
+
+    .theme-switch {
+      position: relative;
+      width: 64px;
+      height: 32px;
+      border-radius: 32px;
+      background-color: var(--toggle-bg);
+      cursor: pointer;
+      transition: background-color 0.8s;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1) inset;
+    }
+
+    .theme-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .switch-handle {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 24px;
+      height: 24px;
+      background-color: #fff;
+      border-radius: 50%;
+      transition: transform 0.6s cubic-bezier(0.3, 1.2, 0.3, 1), background-color 0.6s;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+
+    input:checked + .switch-handle {
+      transform: translateX(32px);
+      background-color: #1a1a1a;
+    }
+
+    /* lil-gui custom theming overrides for premium feel */
+    .lil-gui {
+      --background-color: rgba(15, 15, 20, 0.85);
+      --text-color: #f0f0f0;
+      --title-background-color: rgba(25, 25, 32, 0.9);
+      --widget-color: rgba(50, 50, 60, 0.8);
+      --hover-color: rgba(70, 70, 85, 0.9);
+      --focus-color: rgba(90, 90, 110, 1);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+    }
+
+    [data-theme="light"] .lil-gui {
+      --background-color: rgba(250, 250, 255, 0.85);
+      --text-color: #1a1a1a;
+      --title-background-color: rgba(230, 230, 240, 0.9);
+      --widget-color: rgba(210, 210, 225, 0.8);
+      --hover-color: rgba(190, 190, 205, 0.9);
+      --focus-color: rgba(170, 170, 185, 1);
+      border: 1px solid rgba(0, 0, 0, 0.15);
+    }
+
+    .lil-gui .title { border-radius: 8px 8px 0 0; }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "lil-gui": "https://esm.sh/lil-gui"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="fps-counter">60 FPS</div>
+  <div id="loading">计算排版中...</div>
+  
+  <div class="toggle-container">
+    <span>白洞 (发射)</span>
+    <label class="theme-switch">
+      <input type="checkbox" id="theme-toggle">
+      <div class="switch-handle"></div>
+    </label>
+    <span>黑洞 (吞噬)</span>
+  </div>
+
+  <div id="stage">
+    <div id="black-hole"></div>
+    <div id="white-hole"></div>
+  </div>
+
+  <script type="module">
+    import GUI from 'lil-gui';
+
+    const stage = document.getElementById('stage');
+    const loading = document.getElementById('loading');
+    const themeToggle = document.getElementById('theme-toggle');
+    const bhDom = document.getElementById('black-hole');
+    const whDom = document.getElementById('white-hole');
+
+    let isLightMode = false;
+
+    themeToggle.addEventListener('change', (e) => {
+      isLightMode = e.target.checked;
+      document.body.setAttribute('data-theme', isLightMode ? 'light' : 'dark');
+    });
+
+    const params = {
+      textString: "差评".repeat(300),
+      fontSize: 22,
+      springStiffness: 0.05,
+      damping: 0.85,
+      
+      // Black Hole
+      bhInitialRadius: 50,
+      bhGravity: 1800,
+      bhSpitCount: 50,
+
+      // White Hole
+      whInitialRadius: 40,
+      whShootSpeed: 25,
+      whBulletSize: 6,
+      whRepulsion: 1500,
+
+      applyText: () => initSystem(),
+      reset: () => initSystem()
+    };
+
+    const gui = new GUI({ title: '参数调节 (DOM引擎)', width: 310 });
+    const fGlobal = gui.addFolder('全局设置');
+    
+    // Inject custom Textarea safely
+    const textController = fGlobal.add(params, 'textString').name('文字内容');
+    try {
+      const inputEl = textController.domElement.querySelector('input');
+      if (inputEl) {
+        const textArea = document.createElement('textarea');
+        textArea.value = params.textString;
+        textArea.style.width = '100%';
+        textArea.style.height = '80px';
+        textArea.style.background = 'rgba(0,0,0,0.1)';
+        textArea.style.color = 'inherit';
+        textArea.style.border = '1px solid rgba(255,255,255,0.2)';
+        textArea.style.borderRadius = '4px';
+        textArea.style.padding = '6px';
+        textArea.style.resize = 'vertical';
+        textArea.addEventListener('input', () => { params.textString = textArea.value; });
+        
+        inputEl.parentNode.replaceChild(textArea, inputEl);
+        textController.domElement.style.height = 'auto';
+        const widgetContainer = textController.domElement.querySelector('.widget');
+        if (widgetContainer) widgetContainer.style.height = 'auto';
+      }
+    } catch(e) {
+      console.warn("Could not inject textarea", e);
+    }
+    
+    fGlobal.add(params, 'applyText').name('确认修改排版');
+    fGlobal.add(params, 'fontSize', 12, 80, 1).name('字体大小').onChange(() => initSystem());
+    fGlobal.add(params, 'springStiffness', 0.005, 0.2, 0.001).name('排版张力');
+    fGlobal.add(params, 'damping', 0.5, 0.99, 0.01).name('摩擦阻尼');
+
+    const fBH = gui.addFolder('黑洞 (白天模式)');
+    fBH.add(params, 'bhInitialRadius', 10, 200, 1).name('初始大小').onChange(() => { 
+      blackHole.baseRadius = params.bhInitialRadius; 
+      if (blackHole.swallowedParticles.length === 0) blackHole.radius = params.bhInitialRadius; 
+    });
+    fBH.add(params, 'bhGravity', 100, 20000, 100).name('引力强度 (吸引)');
+    fBH.add(params, 'bhSpitCount', 1, 100, 1).name('喷吐威力 (字/频)');
+
+    const fWH = gui.addFolder('白洞 (黑夜模式)');
+    fWH.add(params, 'whInitialRadius', 10, 200, 1).name('初始大小').onChange(() => { whiteHole.radius = params.whInitialRadius; });
+    fWH.add(params, 'whShootSpeed', 5, 100, 1).name('光子速度');
+    fWH.add(params, 'whBulletSize', 2, 40, 1).name('光子大小');
+    fWH.add(params, 'whRepulsion', 100, 20000, 100).name('引力强度 (排斥)');
+
+    gui.add(params, 'reset').name('重新排版恢复');
+
+    let particles = [];
+    let bullets = [];
+    
+    let system = {
+      x: 0,
+      y: 0,
+      targetX: 0,
+      targetY: 0
+    };
+
+    let blackHole = {
+      baseRadius: params.bhInitialRadius,
+      radius: params.bhInitialRadius,
+      swallowedParticles: [],
+      pulse: 0,
+      scale: 0 
+    };
+
+    let whiteHole = {
+      radius: params.whInitialRadius,
+      pulse: 0,
+      scale: 1 
+    };
+
+    let width, height;
+    let resizeTimeout;
+    
+    function resize() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      
+      system.targetX = width * 0.75;
+      system.targetY = height * 0.5;
+      
+      if (system.x === 0 && system.y === 0) {
+        system.x = system.targetX;
+        system.y = system.targetY;
+      }
+      
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => { initSystem(true); }, 150);
+    }
+    
+    window.addEventListener('resize', resize);
+
+    window.addEventListener('mousemove', (e) => {
+      system.targetX = e.clientX;
+      system.targetY = e.clientY;
+    });
+
+    window.addEventListener('touchmove', (e) => {
+      if (e.touches && e.touches.length > 0) {
+        system.targetX = e.touches[0].clientX;
+        system.targetY = e.touches[0].clientY;
+      }
+    }, {passive: true});
+
+    class Bullet {
+      constructor(x, y, vx, vy) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.radius = params.whBulletSize;
+        this.active = true;
+        this.element = document.createElement('div');
+        this.element.className = 'bullet';
+        this.element.style.width = this.radius * 2 + 'px';
+        this.element.style.height = this.radius * 2 + 'px';
+        stage.appendChild(this.element);
+      }
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        if (this.x < 0 || this.x > width || this.y < 0 || this.y > height) {
+          this.active = false;
+        }
+      }
+      draw() {
+        if (!this.active) return;
+        this.element.style.transform = `translate(-50%, -50%) translate3d(${this.x}px, ${this.y}px, 0)`;
+      }
+      destroy() {
+        if (this.element.parentNode) {
+          this.element.parentNode.removeChild(this.element);
+        }
+      }
+    }
+
+    class Particle {
+      constructor(char, charWidth, originX, originY) {
+        this.char = char;
+        this.charWidth = charWidth;
+        this.originX = originX;
+        this.originY = originY;
+        
+        this.x = originX + (Math.random() - 0.5) * window.innerWidth;
+        this.y = originY + (Math.random() - 0.5) * window.innerHeight;
+        this.vx = 0;
+        this.vy = 0;
+        this.state = 'idle'; // idle, swallowed, knocked_down
+        this.rotation = (Math.random() - 0.5) * Math.PI;
+        this.vRotation = 0;
+
+        this.element = document.createElement('div');
+        this.element.className = 'particle';
+        this.element.textContent = char;
+        this.element.style.fontSize = params.fontSize + 'px';
+        stage.appendChild(this.element);
+      }
+
+      update(bhX, bhY, bhVisualRadius, currentGravity) {
+        if (this.state === 'swallowed') return;
+
+        // Blackhole Gravity
+        if (blackHole.scale > 0.01) {
+          const dx = bhX - this.x;
+          // Subtracted half of fontSize to aim force at center of character
+          const dy = bhY - (this.y + params.fontSize * 0.5);
+          const distSq = dx * dx + dy * dy;
+          const dist = Math.sqrt(distSq);
+          
+          if (dist < bhVisualRadius * blackHole.scale) {
+            this.state = 'swallowed';
+            blackHole.swallowedParticles.push(this);
+            blackHole.radius = Math.min(blackHole.baseRadius + blackHole.swallowedParticles.length * 0.2, 180);
+            return;
+          }
+
+          if (dist > 5 && dist < 1200) {
+            const force = (currentGravity * blackHole.scale) / (distSq + 100); 
+            const massMultiplier = this.state === 'knocked_down' ? 0.6 : 1.0;
+            this.vx += (dx / dist) * force * massMultiplier;
+            this.vy += (dy / dist) * force * massMultiplier;
+          }
+        }
+
+        if (this.state === 'knocked_down') {
+          this.vy += 1.0; // Gravity
+          this.vx *= 0.98; // Air friction
+          this.vy *= 0.98;
+          
+          this.x += this.vx;
+          this.y += this.vy;
+          this.rotation += this.vRotation;
+          
+          let radiusOffset = this.charWidth * 0.5;
+          if (this.x < 0) {
+            this.x = 0;
+            this.vx *= -0.5;
+          } else if (this.x + this.charWidth > width) {
+            this.x = width - this.charWidth;
+            this.vx *= -0.5;
+          }
+          
+          if (this.y + params.fontSize > height) {
+            this.y = height - params.fontSize;
+            this.vy = 0; 
+            this.vx *= 0.5;
+            this.vRotation = 0;
+          }
+          return;
+        }
+
+        // Idle state bounds collision
+        if (this.x < 0) {
+          this.x = 0;
+          this.vx *= -0.6;
+        } else if (this.x + this.charWidth > width) {
+          this.x = width - this.charWidth;
+          this.vx *= -0.6;
+        }
+        if (this.y < 0) {
+          this.y = 0;
+          this.vy *= -0.6;
+        } else if (this.y + params.fontSize > height) {
+          this.y = height - params.fontSize;
+          this.vy *= -0.4;
+          this.vx *= 0.8;
+        }
+
+        // Whitehole Repulsion
+        if (whiteHole.scale > 0.01 && this.state !== 'knocked_down') {
+          const dx = this.x - bhX;
+          const dy = (this.y + params.fontSize * 0.5) - bhY;
+          const distSq = dx * dx + dy * dy;
+          const dist = Math.sqrt(distSq);
+          
+          const whr = whiteHole.radius * whiteHole.scale;
+          
+          if (dist > 0.1 && dist < 600) {
+             const distToHorizon = Math.max(dist - whr, 1);
+             const force = (params.whRepulsion * whiteHole.scale) / (distToHorizon * distToHorizon * 0.1 + 10);
+             this.vx += (dx / dist) * force;
+             this.vy += (dy / dist) * force;
+          }
+        }
+
+        // Spring
+        const sdx = this.originX - this.x;
+        const sdy = this.originY - this.y;
+        this.vx += sdx * params.springStiffness;
+        this.vy += sdy * params.springStiffness;
+
+        // Damping
+        this.vx *= params.damping;
+        this.vy *= params.damping;
+
+        this.x += this.vx;
+        this.y += this.vy;
+        
+        if (Math.abs(this.rotation) > 0.001 || Math.abs(this.vRotation) > 0.001) {
+          this.vRotation -= this.rotation * params.springStiffness; 
+          this.vRotation *= params.damping; 
+          this.rotation += this.vRotation;
+        } else {
+          this.rotation = 0;
+        }
+      }
+
+      draw() {
+        if (this.state === 'swallowed') {
+          this.element.style.display = 'none';
+          return;
+        } else {
+          if (this.element.style.display === 'none') {
+            this.element.style.display = 'block';
+          }
+        }
+
+        // Apply visual state
+        if (this.state === 'knocked_down') {
+          this.element.classList.add('knocked-down');
+        } else {
+          this.element.classList.remove('knocked-down');
+        }
+
+        this.element.style.transform = `translate3d(${this.x}px, ${this.y}px, 0) rotate(${this.rotation}rad)`;
+      }
+
+      destroy() {
+        if (this.element.parentNode) {
+          this.element.parentNode.removeChild(this.element);
+        }
+      }
+    }
+
+    // Extract layout positions using standard DOM
+    function prepareDOMCoordinates() {
+      const container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.visibility = 'hidden';
+      container.style.width = '55vw';
+      container.style.font = `500 ${params.fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
+      container.style.lineHeight = '1.6';
+      container.style.textAlign = 'left';
+      container.style.left = '50%';
+      container.style.transform = 'translate3d(-50%, 0, 0)';
+      container.style.top = '15%';
+
+      container.innerHTML = params.textString.split('').map(c => `<span>${c}</span>`).join('');
+      document.body.appendChild(container);
+
+      // force reflow
+      container.getBoundingClientRect();
+
+      const rects = [];
+      const spans = container.querySelectorAll('span');
+      for (let i = 0; i < spans.length; i++) {
+        const span = spans[i];
+        if (span.textContent.trim() === '') continue;
+        const rect = span.getBoundingClientRect();
+        rects.push({
+          char: span.textContent,
+          originX: rect.left,
+          originY: rect.top,
+          charWidth: rect.width
+        });
+      }
+
+      document.body.removeChild(container);
+      return rects;
+    }
+
+    function initSystem(isResize = false) {
+      if (!isResize) loading.style.display = 'block';
+      setTimeout(() => {
+        try {
+          if (!isResize) resize();
+
+          const layoutItems = prepareDOMCoordinates();
+          
+          if (!isResize) {
+            particles.forEach(p => p.destroy());
+            bullets.forEach(b => b.destroy());
+            particles = [];
+            bullets = [];
+            blackHole.swallowedParticles = [];
+            blackHole.baseRadius = params.bhInitialRadius;
+            blackHole.radius = params.bhInitialRadius;
+            whiteHole.radius = params.whInitialRadius;
+          }
+
+          if (isResize && particles.length === layoutItems.length) {
+            for (let i = 0; i < particles.length; i++) {
+              particles[i].originX = layoutItems[i].originX;
+              particles[i].originY = layoutItems[i].originY;
+            }
+          } else {
+            if (isResize) {
+              particles.forEach(p => p.destroy());
+              bullets.forEach(b => b.destroy());
+              blackHole.swallowedParticles = [];
+            }
+            particles = layoutItems.map(it => new Particle(it.char, it.charWidth, it.originX, it.originY));
+            bullets = [];
+          }
+
+        } catch (e) {
+          console.error("Layout error:", e);
+        } finally {
+          loading.style.display = 'none';
+        }
+      }, 50);
+    }
+
+    let isSpittingBlack = false;
+    let isShootingWhite = false;
+    
+    function spitBlackParticle() {
+      if (blackHole.swallowedParticles.length > 0) {
+        const p = blackHole.swallowedParticles.pop();
+        p.state = 'idle';
+        
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 50 + Math.random() * 50;
+        p.vx = Math.cos(angle) * speed;
+        p.vy = Math.sin(angle) * speed;
+        
+        p.x = system.x + Math.cos(angle) * (blackHole.radius + 15);
+        p.y = system.y + Math.sin(angle) * (blackHole.radius + 15);
+        
+        p.rotation = (Math.random() - 0.5) * Math.PI * 4;
+        p.vRotation = (Math.random() - 0.5) * 2;
+
+        blackHole.pulse = 12;
+      }
+    }
+
+    function shootWhiteBullet() {
+      const angle = Math.PI * 0.8 + Math.random() * Math.PI * 0.4;
+      const speed = params.whShootSpeed;
+      const startX = system.x + Math.cos(angle) * (whiteHole.radius * whiteHole.scale);
+      const startY = system.y + Math.sin(angle) * (whiteHole.radius * whiteHole.scale);
+      bullets.push(new Bullet(startX, startY, Math.cos(angle) * speed, Math.sin(angle) * speed));
+      whiteHole.pulse = 8;
+    }
+
+    function handleInteractionStart() {
+      if (isLightMode) { 
+        isSpittingBlack = true;
+        const count = params.bhSpitCount;
+        for(let i=0; i<count; i++) spitBlackParticle();
+      } else {           
+        isShootingWhite = true;
+        shootWhiteBullet();
+      }
+    }
+
+    // Attach to document.body, but ignore GUI and toggle
+    document.body.addEventListener('mousedown', (e) => {
+      // Ignore if clicking on UI elements
+      if (e.target.closest('.lil-gui') || e.target.closest('.toggle-container')) return;
+      handleInteractionStart();
+    });
+
+    document.body.addEventListener('mouseup', () => { isSpittingBlack = false; isShootingWhite = false; });
+    document.body.addEventListener('mouseleave', () => { isSpittingBlack = false; isShootingWhite = false; });
+    
+    document.body.addEventListener('touchstart', (e) => {
+      if (e.target.closest('.lil-gui') || e.target.closest('.toggle-container')) return;
+      if (e.touches && e.touches.length > 0) {
+        handleInteractionStart();
+      }
+    }, {passive:true});
+    document.body.addEventListener('touchend', () => { isSpittingBlack = false; isShootingWhite = false; });
+
+    const fpsCounter = document.getElementById('fps-counter');
+    let lastFpsTime = performance.now();
+    let frames = 0;
+    let lastTime = performance.now();
+    
+    function loop(time) {
+      requestAnimationFrame(loop);
+      
+      const dt = time - lastTime;
+      lastTime = time;
+
+      frames++;
+      if (time - lastFpsTime >= 1000) {
+        fpsCounter.textContent = `${Math.round(frames * 1000 / (time - lastFpsTime))} FPS`;
+        frames = 0;
+        lastFpsTime = time;
+      }
+
+      const targetBhScale = isLightMode ? 1 : 0;
+      const targetWhScale = isLightMode ? 0 : 1;
+      
+      blackHole.scale += (targetBhScale - blackHole.scale) * 0.08;
+      whiteHole.scale += (targetWhScale - whiteHole.scale) * 0.08;
+
+      if (system.targetX !== 0 || system.targetY !== 0) {
+         system.x += (system.targetX - system.x) * 0.2; 
+         system.y += (system.targetY - system.y) * 0.2;
+      }
+      
+      if (isSpittingBlack && isLightMode && blackHole.swallowedParticles.length > 0) {
+        const count = params.bhSpitCount;
+        for(let i=0; i<count; i++) spitBlackParticle();
+      }
+      if (isShootingWhite && !isLightMode && Math.random() < 0.4) {
+        shootWhiteBullet(); 
+      }
+
+      let targetRadius = blackHole.baseRadius + blackHole.swallowedParticles.length * 0.2;
+      targetRadius = Math.min(targetRadius, 200);
+      blackHole.radius += (targetRadius - blackHole.radius) * 0.1;
+
+      if (blackHole.pulse > 0) blackHole.pulse *= 0.85;
+      if (whiteHole.pulse > 0) whiteHole.pulse *= 0.85;
+
+      const bhVisualRadius = blackHole.radius + blackHole.pulse;
+      
+      // Update DOM Holes
+      if (blackHole.scale > 0.01) {
+        bhDom.style.width = `${bhVisualRadius * 2}px`;
+        bhDom.style.height = `${bhVisualRadius * 2}px`;
+        bhDom.style.transform = `translate(-50%, -50%) translate3d(${system.x}px, ${system.y}px, 0) scale(${blackHole.scale})`;
+        bhDom.style.opacity = blackHole.scale;
+        bhDom.style.boxShadow = `inset 0 0 ${blackHole.pulse + 20}px rgba(0,0,0,0.8)`;
+      } else {
+        bhDom.style.opacity = 0;
+      }
+
+      if (whiteHole.scale > 0.01) {
+        const whVisualRadius = whiteHole.radius + whiteHole.pulse;
+        whDom.style.width = `${whVisualRadius * 2}px`;
+        whDom.style.height = `${whVisualRadius * 2}px`;
+        whDom.style.transform = `translate(-50%, -50%) translate3d(${system.x}px, ${system.y}px, 0) scale(${whiteHole.scale})`;
+        whDom.style.opacity = whiteHole.scale;
+        whDom.style.boxShadow = `0 0 ${whiteHole.pulse + 40}px rgba(255,255,255,0.8)`;
+      } else {
+        whDom.style.opacity = 0;
+      }
+
+      for (let i = 0; i < bullets.length; i++) {
+        bullets[i].update();
+        bullets[i].draw();
+      }
+
+      for (let i = 0; i < bullets.length; i++) {
+        const b = bullets[i];
+        if (!b.active) continue;
+        
+        for (let j = 0; j < particles.length; j++) {
+           const p = particles[j];
+           if (p.state === 'swallowed') continue;
+           
+           const dx = b.x - (p.x + p.charWidth / 2);
+           const dy = b.y - (p.y + params.fontSize / 2);
+           
+           if (Math.abs(dx) > p.charWidth + b.radius || Math.abs(dy) > params.fontSize + b.radius) continue;
+           
+           if (dx*dx + dy*dy < (b.radius + p.charWidth/2) * (b.radius + p.charWidth/2)) {
+             if (p.state === 'idle') { 
+               p.state = 'knocked_down';
+               p.vx = b.vx * 0.7 + (Math.random() - 0.5) * 8;
+               p.vy = b.vy * 0.3 + (Math.random() - 0.5) * 8; 
+               p.vRotation = (Math.random() - 0.5) * 2;
+             } else if (p.state === 'knocked_down') { 
+               p.state = 'idle';
+               p.vy = -12 - Math.random() * 8; 
+               p.vx = (Math.random() - 0.5) * 15;
+               p.vRotation = (Math.random() - 0.5) * 3;
+             }
+             b.active = false;
+             break;
+           }
+        }
+      }
+      
+      const oldBulletCount = bullets.length;
+      bullets = bullets.filter(b => {
+        if (!b.active) b.destroy();
+        return b.active;
+      });
+
+      for (let i = 0; i < particles.length; i++) {
+        particles[i].update(system.x, system.y, bhVisualRadius, params.bhGravity);
+        particles[i].draw();
+      }
+      
+      const kdParticles = particles.filter(p => p.state === 'knocked_down');
+      for (let i = 0; i < kdParticles.length; i++) {
+        for (let j = i + 1; j < kdParticles.length; j++) {
+           const pa = kdParticles[i];
+           const pb = kdParticles[j];
+           const dx = pb.x - pa.x;
+           const dy = pb.y - pa.y;
+           const distSq = dx*dx + dy*dy;
+           const minDist = (pa.charWidth + pb.charWidth) * 0.45;
+           
+           if (distSq < minDist*minDist && distSq > 0.01) {
+             const dist = Math.sqrt(distSq);
+             const overlap = minDist - dist;
+             const nx = dx/dist; 
+             const ny = dy/dist;
+             
+             if (pa.y < pb.y) {
+               pa.y -= Math.abs(ny) * overlap * 0.8;
+               pb.y += Math.abs(ny) * overlap * 0.1; 
+               pa.x -= nx * overlap * 0.5;
+               pb.x += nx * overlap * 0.5;
+               pa.vy = 0;
+               pa.vx *= 0.5;
+               pa.vRotation = 0;
+             } else {
+               pb.y -= Math.abs(ny) * overlap * 0.8;
+               pa.y += Math.abs(ny) * overlap * 0.1;
+               pb.x += nx * overlap * 0.5;
+               pa.x -= nx * overlap * 0.5;
+               pb.vy = 0;
+               pb.vx *= 0.5;
+               pb.vRotation = 0;
+             }
+           }
+        }
+      }
+    }
+
+    // Start engine
+    requestAnimationFrame(loop);
+    
+    // Initial setup with a slight delay to ensure fonts loaded
+    setTimeout(() => {
+      initSystem();
+    }, 100);
+
+  </script>
+</body>
+</html>
