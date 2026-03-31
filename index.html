@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,7 +16,8 @@
       --accent: #1e90ff;
     }
 
-    body, html {
+    body,
+    html {
       margin: 0;
       padding: 0;
       width: 100%;
@@ -30,7 +32,7 @@
       flex-direction: column;
       position: relative;
     }
-    
+
     .bg-animation {
       position: absolute;
       top: 0;
@@ -42,7 +44,8 @@
     }
 
     /* Subtly moving glowing orbs in the background */
-    .bg-animation::before, .bg-animation::after {
+    .bg-animation::before,
+    .bg-animation::after {
       content: '';
       position: absolute;
       width: 400px;
@@ -53,11 +56,13 @@
       opacity: 0.15;
       animation: drift 20s infinite alternate ease-in-out;
     }
+
     .bg-animation::before {
       top: -100px;
       left: -100px;
       background: #ffffff;
     }
+
     .bg-animation::after {
       bottom: -100px;
       right: -100px;
@@ -73,7 +78,7 @@
       text-align: center;
       animation: fadeInDown 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
     }
-    
+
     .menu-container {
       display: flex;
       gap: 40px;
@@ -108,7 +113,7 @@
       left: 50%;
       width: 150%;
       height: 150%;
-      background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%);
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 60%);
       transform: translate(-50%, -50%) scale(0.5);
       opacity: 0;
       transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -143,7 +148,7 @@
       height: 12px;
       border-radius: 50%;
       background: linear-gradient(135deg, #f0f0f0, #888);
-      box-shadow: 0 0 8px rgba(255,255,255,0.5);
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
     }
 
     /* DOM icon representation */
@@ -152,7 +157,7 @@
       height: 12px;
       border-radius: 2px;
       background: linear-gradient(135deg, #4a90e2, #2962ff);
-      box-shadow: 0 0 8px rgba(74,144,226,0.5);
+      box-shadow: 0 0 8px rgba(74, 144, 226, 0.5);
     }
 
     .card-subtitle {
@@ -162,35 +167,55 @@
     }
 
     @keyframes fadeInDown {
-      from { opacity: 0; transform: translateY(-40px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(-40px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(40px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(40px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     @keyframes drift {
-      0% { transform: translate(0, 0); }
-      100% { transform: translate(50px, 50px); }
+      0% {
+        transform: translate(0, 0);
+      }
+
+      100% {
+        transform: translate(50px, 50px);
+      }
     }
   </style>
 </head>
+
 <body>
   <div class="bg-animation"></div>
   <div class="title">选择物理引擎模式</div>
-  
+
   <div class="menu-container">
-    <a href="index.html" class="card">
+    <a href="pretext.html" class="card">
       <div class="card-title">
         阴阳 - pretext
         <div class="icon-canvas"></div>
       </div>
       <div class="card-subtitle">基于 Canvas 原生引擎</div>
     </a>
-    
-    <a href="index2.html" class="card">
+
+    <a href="traditional.html" class="card">
       <div class="card-title">
         阴阳 - traditional
         <div class="icon-dom"></div>
@@ -199,4 +224,5 @@
     </a>
   </div>
 </body>
+
 </html>
